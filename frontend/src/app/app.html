@@ -1,0 +1,369 @@
+<div class="app-layout">
+  <!-- Toast Notification System -->
+  <app-toast-container></app-toast-container>
+
+  <!-- Top Enterprise Navbar -->
+  <header class="navbar">
+    <div class="nav-container">
+      <div class="nav-brand">
+        <div class="brand-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+          </svg>
+        </div>
+        <div>
+          <div class="brand-title">MeetingHub</div>
+          <div class="brand-subtitle">Space Management System</div>
+        </div>
+      </div>
+
+      <div class="nav-actions">
+        <div class="system-status-pill">
+          <span class="status-indicator"></span>
+          <span>API Connected &bull; Working Hours 08:00–20:00</span>
+        </div>
+
+        <button type="button" class="btn-primary-cta" (click)="openBookingModal()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+          <span>Book a Room</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="main-content">
+    <!-- Quick Availability Finder Bar (Bonus Endpoint GET /api/rooms/available) -->
+    <section class="filter-card">
+      <div class="filter-card-header">
+        <div class="filter-title">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <span>Quick Availability Finder</span>
+        </div>
+        <div class="filter-desc">Instantly discover collision-free meeting spaces matching your criteria</div>
+      </div>
+
+      <div class="filter-form-row">
+        <!-- Date -->
+        <div class="filter-input-col">
+          <label class="filter-label">Date</label>
+          <input
+            type="date"
+            [(ngModel)]="filterDate"
+            class="filter-input tabular"
+          />
+        </div>
+
+        <!-- Start Time -->
+        <div class="filter-input-col">
+          <label class="filter-label">From</label>
+          <select [(ngModel)]="filterStartTime" class="filter-select tabular">
+            <option *ngFor="let t of timeOptions" [value]="t">{{ t }}</option>
+          </select>
+        </div>
+
+        <!-- End Time -->
+        <div class="filter-input-col">
+          <label class="filter-label">To</label>
+          <select [(ngModel)]="filterEndTime" class="filter-select tabular">
+            <option *ngFor="let t of timeOptions" [value]="t">{{ t }}</option>
+          </select>
+        </div>
+
+        <!-- Min Capacity -->
+        <div class="filter-input-col">
+          <label class="filter-label">Min Capacity</label>
+          <input
+            type="number"
+            [(ngModel)]="filterMinCapacity"
+            placeholder="e.g. 6"
+            min="1"
+            max="100"
+            class="filter-input tabular"
+          />
+        </div>
+
+        <!-- Search Action Buttons -->
+        <div class="filter-actions-col">
+          <button
+            type="button"
+            class="btn-search"
+            (click)="searchAvailableRooms()"
+            [disabled]="isSearchingAvailable()"
+          >
+            <span class="btn-spinner" *ngIf="isSearchingAvailable()"></span>
+            <svg *ngIf="!isSearchingAvailable()" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <span>Find Free Rooms</span>
+          </button>
+
+          <button
+            type="button"
+            class="btn-reset"
+            *ngIf="isFilterActive()"
+            (click)="clearFilter()"
+          >
+            Show All
+          </button>
+        </div>
+      </div>
+
+      <!-- Filter Active Banner -->
+      <div class="filter-active-pill-row animate-fade-in" *ngIf="isFilterActive()">
+        <span class="pill-badge">
+          Showing {{ filteredRooms().length }} free room(s) for {{ filterDate }} ({{ filterStartTime }} – {{ filterEndTime }})
+          <button (click)="clearFilter()" class="pill-remove-btn" title="Clear filter">&times;</button>
+        </span>
+      </div>
+    </section>
+
+    <!-- Workspace Grid: Rooms List + Selected Room Timeline -->
+    <div class="workspace-grid">
+      <!-- Left Column: Rooms Directory -->
+      <aside class="rooms-column">
+        <div class="section-header">
+          <h2 class="section-title">Meeting Rooms</h2>
+          <span class="rooms-count-badge tabular">{{ filteredRooms().length }} of {{ rooms().length }}</span>
+        </div>
+
+        <!-- Loading Skeleton -->
+        <div *ngIf="isLoadingRooms()" class="rooms-list">
+          <div class="room-skeleton animate-pulse" *ngFor="let i of [1,2,3,4,5]"></div>
+        </div>
+
+        <!-- Rooms List -->
+        <div class="rooms-list" *ngIf="!isLoadingRooms()">
+          <div
+            *ngFor="let room of filteredRooms()"
+            class="room-card"
+            [class.active-room]="selectedRoom()?.id === room.id"
+            (click)="selectRoom(room)"
+          >
+            <div class="room-card-top">
+              <span class="floor-badge">Floor {{ room.floor }}</span>
+              <span class="capacity-tag tabular">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                  <circle cx="9" cy="7" r="4"></circle>
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                </svg>
+                {{ room.capacity }} Seats
+              </span>
+            </div>
+
+            <div class="room-card-name">{{ room.name }}</div>
+
+            <div class="room-card-footer">
+              <span class="view-schedule-link">
+                <span>View Timeline</span>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+              </span>
+            </div>
+          </div>
+
+          <div *ngIf="filteredRooms().length === 0" class="empty-rooms-state">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+              <line x1="9" y1="9" x2="15" y2="15"></line>
+              <line x1="15" y1="9" x2="9" y2="15"></line>
+            </svg>
+            <p>No rooms match this availability slot.</p>
+            <button class="btn-link" (click)="clearFilter()">Reset Filter</button>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Right Column: Room Schedule & Timeline -->
+      <section class="schedule-column">
+        <!-- Room Banner & Date Navigation Header -->
+        <div class="schedule-header-card" *ngIf="selectedRoom()">
+          <div class="room-hero-info">
+            <div>
+              <div class="room-hero-badges">
+                <span class="floor-badge">Floor {{ selectedRoom()!.floor }}</span>
+                <span class="capacity-tag tabular">{{ selectedRoom()!.capacity }} People Max</span>
+              </div>
+              <h1 class="room-hero-title">{{ selectedRoom()!.name }}</h1>
+            </div>
+
+            <button type="button" class="btn-book-this-room" (click)="openBookingModal()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+              <span>Book This Room</span>
+            </button>
+          </div>
+
+          <!-- Date Navigation Bar -->
+          <div class="date-navigator-bar">
+            <div class="date-nav-controls">
+              <button class="nav-arrow-btn" (click)="goToPreviousDay()" title="Previous Day">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="15 18 9 12 15 6"></polyline>
+                </svg>
+              </button>
+
+              <button class="today-btn" (click)="goToToday()">Today</button>
+
+              <button class="nav-arrow-btn" (click)="goToNextDay()" title="Next Day">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+              </button>
+
+              <input
+                type="date"
+                [ngModel]="selectedDate()"
+                (ngModelChange)="onDateChange($event)"
+                class="date-picker-input tabular"
+              />
+            </div>
+
+            <div class="schedule-summary-badge tabular">
+              {{ bookings().length }} reservation{{ bookings().length === 1 ? '' : 's' }} on this date
+            </div>
+          </div>
+        </div>
+
+        <!-- Schedule / Timeline Content -->
+        <div class="timeline-container">
+          <!-- Loading Skeleton -->
+          <div *ngIf="isLoadingBookings()" class="timeline-loading-state">
+            <div class="slot-skeleton animate-pulse" *ngFor="let s of [1,2,3,4]"></div>
+          </div>
+
+          <!-- Timeline Slots (Booked & Free Gaps) -->
+          <div *ngIf="!isLoadingBookings()" class="slots-list">
+            <div
+              *ngFor="let slot of timelineSlots()"
+              class="timeline-slot-card animate-fade-in"
+              [class.slot-booked]="slot.type === 'booked'"
+              [class.slot-available]="slot.type === 'available'"
+            >
+              <!-- Slot Time Header -->
+              <div class="slot-time-col">
+                <div class="slot-time-range tabular">
+                  {{ slot.startFormatted }} – {{ slot.endFormatted }}
+                </div>
+                <div class="slot-duration-tag tabular">
+                  {{ formatDuration(slot.durationMinutes) }}
+                </div>
+              </div>
+
+              <!-- Slot Details -->
+              <div class="slot-main-col">
+                <!-- If Booked -->
+                <ng-container *ngIf="slot.type === 'booked' && slot.booking">
+                  <div class="booked-header-row">
+                    <span class="status-pill-booked">
+                      <span class="dot-booked"></span>
+                      <span>Reserved</span>
+                    </span>
+                    <button
+                      type="button"
+                      class="btn-cancel-slot"
+                      (click)="openCancelDialog(slot.booking, $event)"
+                      title="Cancel reservation"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="3 6 5 6 21 6"></polyline>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                      </svg>
+                      <span>Cancel</span>
+                    </button>
+                  </div>
+
+                  <h3 class="booked-title">{{ slot.booking.title }}</h3>
+
+                  <div class="booked-organizer">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                      <circle cx="12" cy="7" r="4"></circle>
+                    </svg>
+                    <span>Organized by <strong>{{ slot.booking.bookedBy }}</strong></span>
+                  </div>
+                </ng-container>
+
+                <!-- If Available Gap -->
+                <ng-container *ngIf="slot.type === 'available'">
+                  <div class="available-row">
+                    <div>
+                      <span class="status-pill-available">
+                        <span class="dot-available"></span>
+                        <span>Available Slot</span>
+                      </span>
+                      <p class="available-desc">Open for meetings up to {{ formatDuration(slot.durationMinutes) }}</p>
+                    </div>
+
+                    <button
+                      type="button"
+                      class="btn-quick-reserve"
+                      (click)="openBookingModal(slot.startFormatted, slot.endFormatted)"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                      </svg>
+                      <span>Quick Reserve</span>
+                    </button>
+                  </div>
+                </ng-container>
+              </div>
+            </div>
+
+            <!-- Completely Empty Day State -->
+            <div *ngIf="timelineSlots().length === 0" class="empty-timeline-state">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="16" y1="2" x2="16" y2="6"></line>
+                <line x1="8" y1="2" x2="8" y2="6"></line>
+                <line x1="3" y1="10" x2="21" y2="10"></line>
+              </svg>
+              <h3 class="empty-title">Entire Day Open</h3>
+              <p class="empty-desc">No bookings scheduled for this room on {{ selectedDate() }}.</p>
+              <button class="btn-primary-cta" (click)="openBookingModal('09:00', '10:00')">
+                Schedule First Meeting
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <!-- Booking Modal -->
+  <app-booking-modal
+    *ngIf="isBookingModalOpen()"
+    [rooms]="rooms()"
+    [selectedRoomId]="selectedRoom()?.id || null"
+    [initialDate]="selectedDate()"
+    [initialStartTime]="modalInitialStartTime"
+    [initialEndTime]="modalInitialEndTime"
+    (closed)="isBookingModalOpen.set(false)"
+    (bookingCreated)="onBookingCreated()"
+  ></app-booking-modal>
+
+  <!-- Cancel Confirmation Dialog -->
+  <app-cancel-dialog
+    *ngIf="bookingToCancel()"
+    [booking]="bookingToCancel()"
+    [isDeleting]="isCancelling()"
+    (confirmed)="confirmCancelBooking($event)"
+    (cancelled)="bookingToCancel.set(null)"
+  ></app-cancel-dialog>
+</div>

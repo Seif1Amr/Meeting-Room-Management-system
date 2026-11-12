@@ -1,0 +1,147 @@
+<div class="modal-backdrop animate-fade-in" (click)="close()">
+  <div class="modal-card" (click)="$event.stopPropagation()">
+    <!-- Header -->
+    <div class="modal-header">
+      <div>
+        <div class="modal-badge">Direct Reservation</div>
+        <h2 class="modal-title">Book Meeting Space</h2>
+      </div>
+      <button type="button" class="close-btn" (click)="close()" aria-label="Close dialog">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Error Banner for Server Conflicts / Validations -->
+    <div class="api-error-banner animate-fade-in" *ngIf="apiErrorMessage">
+      <div class="error-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+      </div>
+      <div class="error-body">
+        <div class="error-code" *ngIf="apiErrorCode">Conflict &bull; {{ apiErrorCode }}</div>
+        <div class="error-text">{{ apiErrorMessage }}</div>
+      </div>
+    </div>
+
+    <!-- Client-side Validation Banner -->
+    <div class="form-warning-banner" *ngIf="bookingForm.errors && bookingForm.touched">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"></circle>
+        <line x1="12" y1="8" x2="12" y2="12"></line>
+        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+      </svg>
+      <span *ngIf="bookingForm.errors['endBeforeStart']">End time must be strictly after start time.</span>
+      <span *ngIf="bookingForm.errors['outsideWorkingHours']">Bookings must be scheduled between 08:00 and 20:00.</span>
+      <span *ngIf="bookingForm.errors['exceedsMaxDuration']">Duration cannot exceed 4 hours.</span>
+      <span *ngIf="bookingForm.errors['pastDate']">Cannot schedule meetings in the past.</span>
+    </div>
+
+    <!-- Form -->
+    <form [formGroup]="bookingForm" (ngSubmit)="submitBooking()">
+      <div class="form-grid">
+        <!-- Room Selector -->
+        <div class="form-group full-width">
+          <label class="form-label" for="roomId">Target Meeting Room</label>
+          <div class="select-wrapper">
+            <select id="roomId" formControlName="roomId" class="form-select">
+              <option *ngFor="let room of rooms" [value]="room.id">
+                {{ room.name }} (Floor {{ room.floor }} &bull; {{ room.capacity }} seats)
+              </option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Meeting Title -->
+        <div class="form-group full-width">
+          <label class="form-label" for="title">Meeting Title</label>
+          <input
+            id="title"
+            type="text"
+            formControlName="title"
+            class="form-input"
+            placeholder="e.g. Q4 Executive Strategy Sync"
+            [class.input-error]="bookingForm.get('title')?.invalid && bookingForm.get('title')?.touched"
+          />
+          <span class="field-error" *ngIf="bookingForm.get('title')?.invalid && bookingForm.get('title')?.touched">
+            Title is required (minimum 2 characters).
+          </span>
+        </div>
+
+        <!-- Booked By -->
+        <div class="form-group full-width">
+          <label class="form-label" for="bookedBy">Organizer / Booked By</label>
+          <input
+            id="bookedBy"
+            type="text"
+            formControlName="bookedBy"
+            class="form-input"
+            placeholder="e.g. Sarah Jenkins (sarah@company.com)"
+            [class.input-error]="bookingForm.get('bookedBy')?.invalid && bookingForm.get('bookedBy')?.touched"
+          />
+          <span class="field-error" *ngIf="bookingForm.get('bookedBy')?.invalid && bookingForm.get('bookedBy')?.touched">
+            Organizer name or email is required.
+          </span>
+        </div>
+
+        <!-- Date Picker -->
+        <div class="form-group full-width">
+          <label class="form-label" for="date">Date</label>
+          <input
+            id="date"
+            type="date"
+            formControlName="date"
+            class="form-input tabular"
+          />
+        </div>
+
+        <!-- Start Time -->
+        <div class="form-group half-width">
+          <label class="form-label" for="startTime">Start Time</label>
+          <div class="select-wrapper">
+            <select id="startTime" formControlName="startTime" class="form-select tabular">
+              <option *ngFor="let time of timeOptions" [value]="time">{{ time }}</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- End Time -->
+        <div class="form-group half-width">
+          <label class="form-label" for="endTime">End Time</label>
+          <div class="select-wrapper">
+            <select id="endTime" formControlName="endTime" class="form-select tabular">
+              <option *ngFor="let time of timeOptions" [value]="time">{{ time }}</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Duration Summary Pill -->
+      <div class="duration-badge-row" *ngIf="calculatedDurationFormatted">
+        <span class="duration-tag">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 16 14"></polyline>
+          </svg>
+          Selected Duration: <strong>{{ calculatedDurationFormatted }}</strong>
+        </span>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" (click)="close()" [disabled]="isSubmitting">
+          Cancel
+        </button>
+        <button type="submit" class="btn-primary" [disabled]="bookingForm.invalid || isSubmitting">
+          <span class="btn-spinner" *ngIf="isSubmitting"></span>
+          <span>{{ isSubmitting ? 'Checking & Reserving...' : 'Confirm Reservation' }}</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
