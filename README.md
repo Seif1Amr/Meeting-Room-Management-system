@@ -5,232 +5,167 @@
 [![EF Core SQLite](https://img.shields.io/badge/EF%20Core-SQLite-003B57.svg)](https://learn.microsoft.com/ef/core/)
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED.svg)](https://www.docker.com/)
 [![Tests](https://img.shields.io/badge/xUnit%20Tests-34%20Passed-brightgreen.svg)]()
+[![Frontend Tests](https://img.shields.io/badge/Vitest-4%20Passed-brightgreen.svg)]()
 
-> A full-stack, enterprise-grade Meeting Room Booking application built for the **DigitalHub Technical Assessment**. Designed with clean architecture, strict collision-free scheduling validation, modern minimalist UI (Linear/Stripe aesthetic), and zero-setup local & containerized execution.
-
----
-
-## Table of Contents
-- [Architecture & Monorepo Layout](#architecture--monorepo-layout)
-- [Quick Start Guide](#quick-start-guide)
-  - [Option A: Docker Compose (One-Command Setup)](#option-a-docker-compose-one-command-setup)
-  - [Option B: Local Development Run](#option-b-local-development-run)
-- [API Specification & Endpoints](#api-specification--endpoints)
-- [Strict Booking Business Rules](#strict-booking-business-rules)
-- [Testing Suite](#testing-suite)
-- [Key Architectural Decisions & Assumptions](#key-architectural-decisions--assumptions)
-- [Future Enhancements & Roadmap](#future-enhancements--roadmap)
+> A full-stack, enterprise-grade Meeting Room Booking application built for the **DigitalHub Technical Assessment**.
+> Features clean architecture, collision-free scheduling validation, modern minimalist UI (Linear/Stripe aesthetic), zero-setup auto-seeded database, and one-click execution.
 
 ---
 
-## Architecture & Monorepo Layout
+## ⚡ Quick Start for Reviewers (Zero Setup Required)
 
-```
-meetings-room-managment/
-├── backend/                             # .NET 8 ASP.NET Core Web API
-│   ├── Controllers/                     # Thin REST controllers (RoomsController, BookingsController)
-│   ├── Data/                            # AppDbContext & DbInitializer (SQLite auto-seed)
-│   ├── Domain/
-│   │   ├── Entities/                    # Room, Booking domain entities
-│   │   └── Exceptions/                  # Domain exceptions (BookingConflictException, etc.)
-│   ├── DTOs/                            # Clean Request/Response contracts & API error models
-│   ├── Middleware/                      # Global ExceptionHandlingMiddleware (400, 404, 409, 500)
-│   ├── Services/                        # Business logic & validation (BookingService, RoomService)
-│   ├── appsettings.json
-│   ├── Dockerfile                       # Multi-stage .NET 8 production Dockerfile
-│   └── Program.cs                       # DI, CORS, Swagger, and DB lifecycle
-│
-├── backend.Tests/                       # xUnit Test Suite (34 automated unit tests)
-│   ├── TestHelpers/                     # In-memory DbContext helper & TestDateTimeProvider
-│   └── UnitTests/                       # Exhaustive overlap, validation rule & availability tests
-│
-├── frontend/                            # Angular Standalone Architecture (Angular 16+)
-│   ├── src/app/
-│   │   ├── components/                  # BookingModalComponent, CancelDialogComponent, ToastContainer
-│   │   ├── models/                      # Strongly-typed TypeScript interfaces
-│   │   ├── services/                    # RoomService, BookingService, ToastService
-│   │   ├── app.ts / app.html / app.css  # Unified dashboard, timeline & room schedule view
-│   ├── nginx.conf                       # Production Nginx reverse-proxy & SPA fallback
-│   └── Dockerfile                       # Multi-stage Node.js build + Nginx runtime
-│
-├── docker-compose.yml                   # Root orchestration for Backend & Frontend
-└── README.md                            # Comprehensive engineering documentation
-```
+Choose whichever method fits your local machine best:
 
----
-
-## Quick Start Guide
-
-### Option A: Docker Compose (One-Command Setup)
-
-Ensure Docker Desktop or Docker engine is running:
+### 🚀 Option 1: Docker Compose (Recommended - Zero Installation Needed)
+If you have Docker Desktop running, spin up both the backend and frontend with one command:
 
 ```bash
 docker compose up --build
 ```
 
-- **Frontend Application**: [http://localhost:4200](http://localhost:4200) (also available on port 80: [http://localhost](http://localhost))
-- **Backend API & Swagger UI**: [http://localhost:5000/swagger](http://localhost:5000/swagger)
+- **Frontend Web UI**: [http://localhost:4200](http://localhost:4200) (also [http://localhost](http://localhost))
+- **Swagger / OpenAPI Documentation**: [http://localhost:5000/swagger](http://localhost:5000/swagger)
 
-> **Zero Manual Setup**: The SQLite database (`rooms.db`) is automatically generated and seeded on startup with 5 realistic enterprise rooms and sample schedule bookings.
-
----
-
-### Option B: Local Development Run
-
-#### Prerequisites:
-- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
-- [Node.js (v18+ or v20+)](https://nodejs.org/) & npm
-
-#### 1. Start the Backend API (.NET 8):
-```bash
-cd backend
-dotnet run --urls http://localhost:5000
-```
-- Swagger documentation opens at: [http://localhost:5000/swagger](http://localhost:5000/swagger)
-- The SQLite database `rooms.db` is automatically created and populated.
-
-#### 2. Start the Frontend (Angular):
-```bash
-cd frontend
-npm install --legacy-peer-deps
-npm start
-```
-- Open [http://localhost:4200](http://localhost:4200) in your browser.
+*(To stop the containers later: `docker compose down`)*
 
 ---
 
-## API Specification & Endpoints
+### 💻 Option 2: One-Click Local Script
+If you prefer running locally with .NET and Node already installed:
 
-All endpoints follow strict REST conventions, returning standard JSON representations. Errors return a uniform contract:
-```json
-{
-  "message": "The requested time slot overlaps with an existing booking in this room.",
-  "code": "BOOKING_CONFLICT"
-}
-```
+- **Windows (PowerShell)**:
+  ```powershell
+  .\start.ps1
+  ```
+- **macOS / Linux**:
+  ```bash
+  chmod +x start.sh && ./start.sh
+  ```
 
-| Method | Endpoint | Description | Status Codes |
-|---|---|---|---|
-| `GET` | `/api/rooms` | Retrieve all 5 seeded meeting rooms | `200 OK` |
-| `GET` | `/api/rooms/{id}` | Get room details by ID | `200 OK`, `404 Not Found` |
-| `GET` | `/api/rooms/{id}/bookings?date=YYYY-MM-DD` | List bookings for a room on given date, ordered by StartTime ascending | `200 OK`, `404 Not Found` |
-| `POST` | `/api/bookings` | Validate business rules and create booking | `201 Created`, `400 Bad Request`, `404 Not Found`, `409 Conflict` |
-| `DELETE` | `/api/bookings/{id}` | Cancel/delete an existing reservation | `204 No Content`, `404 Not Found` |
-| `GET` | `/api/rooms/available?date=YYYY-MM-DD&startTime=HH:mm&endTime=HH:mm&minCapacity=N` | **Bonus Endpoint**: Discover collision-free rooms matching capacity for slot | `200 OK`, `400 Bad Request` |
-
-### Sample `POST /api/bookings` Payload:
-```json
-{
-  "roomId": 1,
-  "title": "Executive Board Sync",
-  "bookedBy": "Layla Omar (layla@company.com)",
-  "startTime": "2026-11-20T10:00:00",
-  "endTime": "2026-11-20T11:30:00"
-}
-```
+This automatically starts the backend API on port `5000` and the Angular frontend on port `4200`.
 
 ---
 
-## Strict Booking Business Rules
+### 🛠️ Option 3: Standard Terminal Commands
 
-All validation rules are enforced centrally inside `BookingService` and mirrored client-side in the Angular Reactive Form for instant feedback:
+1. **Start Backend (.NET 8)**:
+   ```bash
+   cd backend
+   dotnet run --urls http://localhost:5000
+   ```
+   *Swagger available at: [http://localhost:5000/swagger](http://localhost:5000/swagger)*
 
-1. **Rule 1 (Overlap Prevention)**:
-   - A booking must not overlap with any existing booking in the same room:
-     $$\text{newStart} < \text{existingEnd} \land \text{newEnd} > \text{existingStart}$$
-   - **Back-to-back bookings ARE strictly permitted** (e.g., Meeting A ending at `10:00` and Meeting B starting at `10:00` do not collide).
-   - Collision triggers HTTP `409 Conflict` with code `"BOOKING_CONFLICT"`.
-
-2. **Rule 2 (Chronology & Future-Only)**:
-   - `EndTime` must be strictly after `StartTime`.
-   - Bookings cannot be made in the past.
-   - Triggers HTTP `400 Bad Request` (`"INVALID_TIME_RANGE"` / `"PAST_BOOKING_NOT_ALLOWED"`).
-
-3. **Rule 3 (Working Hours & Same Day)**:
-   - Bookings must start and end on the same calendar day.
-   - Must fit entirely within working hours `08:00` to `20:00` (`StartTime >= 08:00` and `EndTime <= 20:00`).
-   - Triggers HTTP `400 Bad Request` (`"OUTSIDE_WORKING_HOURS"` / `"CROSS_DAY_NOT_ALLOWED"`).
-
-4. **Rule 4 (Maximum Duration)**:
-   - A booking cannot exceed `4 hours` in duration.
-   - Triggers HTTP `400 Bad Request` (`"EXCEEDS_MAX_DURATION"`).
+2. **Start Frontend (Angular)**:
+   ```bash
+   cd frontend
+   npm install --legacy-peer-deps
+   npm start
+   ```
+   *Application available at: [http://localhost:4200](http://localhost:4200)*
 
 ---
 
-## Testing Suite
+## 🧪 Running Automated Tests
 
-### Backend Unit Tests (`/backend.Tests` using xUnit)
-The backend test suite contains **34 comprehensive unit tests** testing all edge cases:
+Run the full automated test suite (34 backend tests + 4 frontend tests) in one command:
 
-```bash
-dotnet test backend.Tests/MeetingRoomManagement.Tests.csproj
-```
+- **Windows**:
+  ```powershell
+  .\test.ps1
+  ```
+- **macOS / Linux**:
+  ```bash
+  chmod +x test.sh && ./test.sh
+  ```
+- **Or via npm**:
+  ```bash
+  npm test
+  ```
 
-- **Overlap Scenarios Tested**:
-  - Exact identical overlap (10:00–11:00 vs 10:00–11:00) $\to$ `409 Conflict`
-  - Partial overlap starting inside existing booking $\to$ `409 Conflict`
-  - Partial overlap ending inside existing booking $\to$ `409 Conflict`
-  - Enveloping overlap (new spans outside existing) $\to$ `409 Conflict`
-  - Enveloped overlap (existing spans outside new) $\to$ `409 Conflict`
-  - Back-to-back boundary immediately before (09:00–10:00 / 10:00–11:00) $\to$ Success
-  - Back-to-back boundary immediately after (10:00–11:00 / 11:00–12:00) $\to$ Success
-  - Cross-room isolation (same time slot in different room) $\to$ Success
-
-- **Validation Rules Tested**:
-  - Past dates & past times earlier today $\to$ `400 Bad Request`
-  - End time earlier than or equal to start time $\to$ `400 Bad Request`
-  - Multi-day spanning bookings $\to$ `400 Bad Request`
-  - Booking before 08:00 or ending after 20:00 $\to$ `400 Bad Request`
-  - Exact 08:00 start and exact 20:00 end boundaries $\to$ Success
-  - Duration > 4 hours (e.g. 4 hrs 1 min) $\to$ `400 Bad Request`
-  - Exact 4 hours duration $\to$ Success
-  - Missing or blank title/organizer $\to$ `400 Bad Request`
-  - Non-existent room ID $\to$ `404 Not Found`
-
-- **Availability Finder Tests**:
-  - Excludes booked rooms, includes free rooms, applies capacity filtering.
-
-### Frontend Unit Tests (Vitest)
-```bash
-cd frontend
-npm test -- --watch=false
-```
-- Tests component rendering, initial room selection, chronological timeline generation with open gap calculation, and date navigation.
+### Individual Test Runs:
+- **Backend Tests (xUnit)**:
+  ```bash
+  dotnet test backend.Tests/MeetingRoomManagement.Tests.csproj
+  ```
+- **Frontend Tests (Vitest)**:
+  ```bash
+  cd frontend && npm test -- --watch=false
+  ```
 
 ---
 
-## Key Architectural Decisions & Assumptions
+## 🏢 Pre-Seeded Meeting Rooms & Sample Data
+
+On startup, the SQLite database (`rooms.db`) is automatically created and seeded. No manual migrations or SQL scripts required:
+
+| Room Name | Floor | Capacity | Features / Character |
+|---|:---:|:---:|---|
+| **Cairo Executive Suite** | 3 | 16 seats | Boardroom display, conferencing suite |
+| **Nile Boardroom** | 2 | 12 seats | Dual screen, executive conference setup |
+| **Giza Innovation Pod** | 1 | 6 seats | Collaborative brainstorming pod |
+| **Alexandria Focus Room** | 2 | 4 seats | 1-on-1s, interviews, and deep work |
+| **Heliopolis Studio** | 1 | 8 seats | Design workshops & project team syncs |
+
+*Sample bookings are also pre-seeded for today so the schedule timeline is immediately populated with interactive cards and open gaps.*
+
+---
+
+## 📋 Strict Booking Business Rules
+
+Enforced centrally in `BookingService` and mirrored client-side in the Angular Reactive Form:
+
+| Rule | Description | Status Code | Error Code |
+|---|---|:---:|:---:|
+| **1. Overlap Prevention** | Booking must not overlap existing meetings ($\text{newStart} < \text{existingEnd} \land \text{newEnd} > \text{existingStart}$).<br/>*Back-to-back bookings (e.g. 10:00 end / 10:00 start) ARE allowed.* | `409 Conflict` | `BOOKING_CONFLICT` |
+| **2. Chronology & Future** | `EndTime` must be strictly after `StartTime`, and meetings cannot be scheduled in the past. | `400 Bad Request` | `INVALID_TIME_RANGE`<br/>`PAST_BOOKING_NOT_ALLOWED` |
+| **3. Working Hours & Same Day** | Must start and end on the same calendar day, strictly between `08:00` and `20:00`. | `400 Bad Request` | `OUTSIDE_WORKING_HOURS`<br/>`CROSS_DAY_NOT_ALLOWED` |
+| **4. Max Duration** | Meeting duration cannot exceed `4 hours`. | `400 Bad Request` | `EXCEEDS_MAX_DURATION` |
+
+---
+
+## 📡 REST API Endpoints Specification
+
+| Method | Endpoint | Description | Return Code |
+|---|---|---|:---:|
+| `GET` | `/api/rooms` | List all meeting rooms ordered by floor and name | `200 OK` |
+| `GET` | `/api/rooms/{id}` | Get single room details by ID | `200 OK` / `404` |
+| `GET` | `/api/rooms/{id}/bookings?date=YYYY-MM-DD` | Get room bookings for date, strictly ordered by `StartTime` ascending | `200 OK` / `404` |
+| `POST` | `/api/bookings` | Validate business rules and create new reservation | `201 Created` / `400` / `409` |
+| `DELETE` | `/api/bookings/{id}` | Cancel/delete reservation | `204 No Content` / `404` |
+| `GET` | `/api/rooms/available?date=...&startTime=...&endTime=...&minCapacity=...` | **Bonus Endpoint**: Filter collision-free rooms for requested slot | `200 OK` / `400` |
+
+---
+
+## 🎨 UI/UX Highlights (Linear / Stripe Aesthetic)
+
+- **Geometric Typography & Tabular Numbers**: Utilizes `Inter` and `Plus Jakarta Sans` with `font-variant-numeric: tabular-nums` to eliminate visual jitter on clock values and counts.
+- **Quick Availability Finder**: Header search bar lets users enter a desired slot and capacity to filter all rooms in real time.
+- **Visual Schedule & Open Gap Highlighting**: Segments the 08:00–20:00 day into booked slots and emerald **"Available Slot"** gaps with a one-click **"Quick Reserve"** button.
+- **Dual-Layer Validation**: Instant feedback in Angular forms plus an error banner that displays server 409 conflict reasons.
+- **Cancellation Confirmation**: Clean confirmation modal with optimistic UI removal and toast alert.
+
+---
+
+## 🏛️ Architectural Highlights & Assumptions
 
 1. **Thin Controllers & Rich Services**:
-   Controllers only handle HTTP serialization and status mapping. All domain assertions, conflict checks, and queries live in `BookingService` and `RoomService`.
+   Controllers only handle routing and HTTP status codes. Domain assertions, conflict math, and validations reside in `BookingService` and `RoomService`.
 
-2. **Strict Separation of Domain & DTOs**:
-   EF Core entities (`Room`, `Booking`) are never returned directly to API callers. Strongly-typed DTOs decouple persistence schemas from public API contracts.
+2. **Strict Separation of Domain Entities & DTOs**:
+   EF Core entities (`Room`, `Booking`) are decoupled from external API contracts. DTOs prevent accidental over-posting and protect internal database structures.
 
-3. **Deterministic Time Simulation via `IDateTimeProvider`**:
-   Rather than hardcoding `DateTime.Now`, backend services inject `IDateTimeProvider`. This allows unit tests to freeze or advance time deterministically without clock drift.
+3. **Deterministic Time Testing with `IDateTimeProvider`**:
+   Time checks inject `IDateTimeProvider` (backed by `SystemDateTimeProvider`), allowing unit tests to freeze time deterministically without clock drift.
 
-4. **Zero-Setup Database Initialization**:
-   `DbInitializer.InitializeAsync` runs on startup, automatically creating tables and seeding the 5 specified enterprise rooms:
-   - Cairo Executive Suite (Floor 3, Capacity 16)
-   - Nile Boardroom (Floor 2, Capacity 12)
-   - Giza Innovation Pod (Floor 1, Capacity 6)
-   - Alexandria Focus Room (Floor 2, Capacity 4)
-   - Heliopolis Studio (Floor 1, Capacity 8)
-
-5. **Linear/Stripe Minimalist UI Aesthetic**:
-   - Tabular typography (`font-variant-numeric: tabular-nums`) prevents visual jitter in time displays and capacities.
-   - Visual schedule alternates booked cards with emerald available gaps featuring a **"Quick Reserve"** action that pre-fills the booking modal.
-   - Dual-layer validation prevents unnecessary roundtrips while gracefully rendering server 409 conflict messages if a race condition occurs.
+4. **Robust Reverse Proxy in Production**:
+   Nginx handles client-side Angular routing (`try_files $uri $uri/ /index.html`), reverse-proxies `/api/` calls to the backend, and enables gzip compression.
 
 ---
 
-## Future Enhancements & Roadmap
+## 🚀 Production Roadmap & Future Enhancements
 
-If extended for production deployment, the following features would be added:
-1. **Authentication & RBAC**: Integration with OAuth2 / OpenID Connect (Azure AD / Auth0) for Single Sign-On and admin-only room deletion permissions.
-2. **Real-Time Live Updates via SignalR**: Push notifications when another user reserves or cancels a room so all clients update instantaneously without polling.
-3. **Recurring Reservations**: Support for weekly/bi-weekly recurring meetings with conflict exception reporting.
-4. **Calendar Integration**: Two-way sync with Google Calendar and Microsoft 365 Exchange via Microsoft Graph.
-5. **Room Hardware Telemetry**: Display live IoT occupancy sensors, video conferencing hardware (e.g. Teams Rooms, Zoom Rooms), and digital whiteboard equipment.
+1. **Authentication & Role-Based Access Control (RBAC)**: Azure AD / Auth0 SSO integration with admin-only room deletion permissions.
+2. **Real-Time SignalR WebSockets**: Instant schedule sync across all open browser tabs when any booking is created or cancelled.
+3. **Recurring Bookings**: Support for daily, weekly, or monthly repeating reservations with conflict reporting.
+4. **Calendar Integration**: Bidirectional sync with Google Calendar and Microsoft 365 Outlook via Microsoft Graph.
+5. **IoT Room Telemetry**: Live occupancy indicators connected to hardware motion sensors and meeting display tablets.

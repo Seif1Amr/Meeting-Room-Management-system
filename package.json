@@ -1,0 +1,24 @@
+{
+  "name": "meetings-room-management",
+  "version": "1.0.0",
+  "description": "Enterprise Meeting Room Management System - DigitalHub Technical Assessment",
+  "private": true,
+  "scripts": {
+    "start": "docker compose up --build",
+    "up": "docker compose up -d --build",
+    "down": "docker compose down",
+    "test": "npm run test:backend && npm run test:frontend",
+    "test:backend": "dotnet test backend.Tests/MeetingRoomManagement.Tests.csproj",
+    "test:frontend": "cd frontend && npm test -- --watch=false",
+    "build:backend": "dotnet build backend/MeetingRoomManagement.Api.csproj",
+    "build:frontend": "cd frontend && npm run build"
+  },
+  "keywords": [
+    "dotnet8",
+    "angular",
+    "meeting-room-management",
+    "sqlite",
+    "docker"
+  ],
+  "author": "DigitalHub Candidate"
+}
