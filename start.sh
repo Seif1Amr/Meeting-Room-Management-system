@@ -29,6 +29,14 @@ if [ ! -d "node_modules" ]; then
     npm install --legacy-peer-deps
 fi
 echo "   -> Frontend web application: http://localhost:4200"
+
+# Open browser if available
+if command -v open >/dev/null 2>&1; then
+    (sleep 2 && open http://localhost:4200) &
+elif command -v xdg-open >/dev/null 2>&1; then
+    (sleep 2 && xdg-open http://localhost:4200) &
+fi
+
 echo ""
 echo "Press Ctrl+C to stop both frontend and backend."
 echo ""

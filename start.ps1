@@ -5,12 +5,14 @@ Write-Host "============================================================" -Foreg
 Write-Host "  Launching MeetingHub Full-Stack Application" -ForegroundColor Cyan
 Write-Host "============================================================" -ForegroundColor Cyan
 
-# Find dotnet SDK executable
+# Find dotnet SDK executable and set DOTNET_ROOT
 $dotnetExe = "dotnet"
 if (Test-Path "$env:LOCALAPPDATA\Microsoft\dotnet\dotnet.exe") {
     $dotnetExe = "$env:LOCALAPPDATA\Microsoft\dotnet\dotnet.exe"
+    $env:DOTNET_ROOT = "$env:LOCALAPPDATA\Microsoft\dotnet"
 } elseif (Test-Path "$env:USERPROFILE\.dotnet\dotnet.exe") {
     $dotnetExe = "$env:USERPROFILE\.dotnet\dotnet.exe"
+    $env:DOTNET_ROOT = "$env:USERPROFILE\.dotnet"
 }
 
 Write-Host "`n1. Starting .NET 8 Backend API on http://localhost:5000..." -ForegroundColor Yellow
@@ -26,7 +28,9 @@ try {
         npm install --legacy-peer-deps
     }
     Write-Host "   -> Frontend web application: http://localhost:4200" -ForegroundColor Green
-    Write-Host "`nPress Ctrl+C to stop both frontend and backend.`n" -ForegroundColor Cyan
+    Write-Host "`nOpening browser at http://localhost:4200..." -ForegroundColor Cyan
+    Start-Process "http://localhost:4200"
+    Write-Host "Press Ctrl+C to stop both frontend and backend.`n" -ForegroundColor Cyan
     npm start
 } finally {
     Pop-Location
