@@ -190,6 +190,31 @@ import { Booking } from '../models/booking.model';
     @keyframes spin {
       to { transform: rotate(360deg); }
     }
+
+    @media (max-width: 640px) {
+      .modal-backdrop {
+        padding: 8px;
+        align-items: flex-end;
+      }
+      .dialog-card {
+        padding: 20px 16px;
+        border-bottom-left-radius: 0;
+        border-bottom-right-radius: 0;
+        width: 100%;
+      }
+      .dialog-actions {
+        flex-direction: column-reverse;
+        gap: 10px;
+        width: 100%;
+      }
+      .btn-cancel, .btn-confirm-delete {
+        width: 100%;
+        height: 46px;
+        justify-content: center;
+        font-size: 14px;
+        touch-action: manipulation;
+      }
+    }
   `]
 })
 export class CancelDialogComponent {

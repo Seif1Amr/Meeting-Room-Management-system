@@ -57,6 +57,9 @@ export class App implements OnInit {
   modalInitialStartTime: string = '09:00';
   modalInitialEndTime: string = '10:00';
 
+  // Responsive mobile view tab ('schedule' | 'rooms')
+  activeMobileTab = signal<'schedule' | 'rooms'>('schedule');
+
   bookingToCancel = signal<Booking | null>(null);
   isCancelling = signal<boolean>(false);
 
@@ -132,6 +135,7 @@ export class App implements OnInit {
 
   selectRoom(room: Room): void {
     this.selectedRoom.set(room);
+    this.activeMobileTab.set('schedule');
     this.loadRoomSchedule(room.id, this.selectedDate());
   }
 
@@ -308,6 +312,7 @@ export class App implements OnInit {
         // 1. Synchronize timeline view date to the requested search date
         this.selectedDate.set(this.filterDate);
         this.modalInitialDate = this.filterDate;
+        this.activeMobileTab.set('schedule');
 
         // 2. Load schedule for searched date
         if (avail.length > 0) {
