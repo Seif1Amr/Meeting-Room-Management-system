@@ -31,9 +31,11 @@ export class App implements OnInit {
 
   // Rooms state
   rooms = signal<Room[]>([]);
+  availableRooms = signal<Room[]>([]);
   filteredRooms = signal<Room[]>([]);
   selectedRoom = signal<Room | null>(null);
   isLoadingRooms = signal<boolean>(false);
+  searchQuery = signal<string>('');
 
   // Selected schedule state
   selectedDate = signal<string>(new Date().toISOString().split('T')[0]);
@@ -45,7 +47,7 @@ export class App implements OnInit {
   filterDate: string = new Date().toISOString().split('T')[0];
   filterStartTime: string = '09:00';
   filterEndTime: string = '11:00';
-  filterMinCapacity: number | null = null;
+  filterMinCapacity: number | string | null = null;
   isFilterActive = signal<boolean>(false);
   isSearchingAvailable = signal<boolean>(false);
 
@@ -62,7 +64,33 @@ export class App implements OnInit {
 
   ngOnInit(): void {
     this.generateTimeOptions();
+    this.initDefaultFilter();
     this.loadRooms();
+  }
+
+  initDefaultFilter(): void {
+    const now = new Date();
+    const currentHour = now.getHours();
+    let initialDate = now.toISOString().split('T')[0];
+    let initialStart = '09:00';
+    let initialEnd = '11:00';
+
+    if (currentHour >= 19) {
+      // If evening, default availability search to tomorrow morning 09:00 - 11:00
+      const tomorrow = new Date(now);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      initialDate = tomorrow.toISOString().split('T')[0];
+    } else if (currentHour >= 8 && currentHour < 19) {
+      // If during working hours, default to next hour
+      const nextH = currentHour + 1;
+      const endH = Math.min(nextH + 1, 20);
+      initialStart = `${nextH.toString().padStart(2, '0')}:00`;
+      initialEnd = `${endH.toString().padStart(2, '0')}:00`;
+    }
+
+    this.filterDate = initialDate;
+    this.filterStartTime = initialStart;
+    this.filterEndTime = initialEnd;
   }
 
   generateTimeOptions(): void {
@@ -83,7 +111,8 @@ export class App implements OnInit {
     this.roomService.getAllRooms().subscribe({
       next: (data) => {
         this.rooms.set(data);
-        this.filteredRooms.set(data);
+        this.availableRooms.set(data);
+        this.applyFilterAndSearch();
         this.isLoadingRooms.set(false);
 
         // Auto-select first room if none selected
@@ -206,11 +235,54 @@ export class App implements OnInit {
     this.onDateChange(today);
   }
 
+  // Text search in rooms list
+  onSearchQueryChange(query: string): void {
+    this.searchQuery.set(query);
+    this.applyFilterAndSearch();
+  }
+
+  applyFilterAndSearch(): void {
+    const baseList = this.isFilterActive() ? this.availableRooms() : this.rooms();
+    const query = this.searchQuery().trim().toLowerCase();
+
+    if (!query) {
+      this.filteredRooms.set(baseList);
+      return;
+    }
+
+    const matched = baseList.filter(room =>
+      room.name.toLowerCase().includes(query) ||
+      `floor ${room.floor}`.toLowerCase().includes(query) ||
+      `${room.capacity} seats`.toLowerCase().includes(query) ||
+      `${room.capacity}` === query
+    );
+
+    this.filteredRooms.set(matched);
+  }
+
   // Availability Search
   searchAvailableRooms(): void {
-    if (this.filterEndTime <= this.filterStartTime) {
-      this.toastService.error('End time must be after start time.', 'Invalid Search Slot');
+    const [startH, startM] = this.filterStartTime.split(':').map(Number);
+    const [endH, endM] = this.filterEndTime.split(':').map(Number);
+    const startMins = startH * 60 + startM;
+    const endMins = endH * 60 + endM;
+
+    if (endMins <= startMins) {
+      this.toastService.error('End time must be strictly after start time.', 'Invalid Search Slot');
       return;
+    }
+
+    if (endMins - startMins > 240) {
+      this.toastService.error('Search slot duration cannot exceed 4 hours.', 'Invalid Search Slot');
+      return;
+    }
+
+    let safeMinCap: number | null = null;
+    if (this.filterMinCapacity !== null && this.filterMinCapacity !== undefined && this.filterMinCapacity !== '') {
+      const parsed = parseInt(String(this.filterMinCapacity).trim(), 10);
+      if (!isNaN(parsed) && parsed > 0) {
+        safeMinCap = parsed;
+      }
     }
 
     this.isSearchingAvailable.set(true);
@@ -218,14 +290,15 @@ export class App implements OnInit {
       date: this.filterDate,
       startTime: this.filterStartTime,
       endTime: this.filterEndTime,
-      minCapacity: this.filterMinCapacity ? Number(this.filterMinCapacity) : null
+      minCapacity: safeMinCap
     };
 
     this.roomService.getAvailableRooms(query).subscribe({
       next: (avail) => {
         this.isSearchingAvailable.set(false);
-        this.filteredRooms.set(avail);
+        this.availableRooms.set(avail);
         this.isFilterActive.set(true);
+        this.applyFilterAndSearch();
 
         if (avail.length > 0) {
           // If current room is not in available list, auto-select first available
@@ -245,9 +318,10 @@ export class App implements OnInit {
   }
 
   clearFilter(): void {
-    this.filteredRooms.set(this.rooms());
+    this.availableRooms.set(this.rooms());
     this.isFilterActive.set(false);
     this.filterMinCapacity = null;
+    this.applyFilterAndSearch();
   }
 
   // Quick reservation modal

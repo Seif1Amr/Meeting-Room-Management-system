@@ -57,15 +57,6 @@ public class RoomService : IRoomService
             throw new BookingValidationException("Requested slot duration cannot exceed 4 hours.", "EXCEEDS_MAX_DURATION");
         }
 
-        var now = _dateTimeProvider.Now;
-        var today = DateOnly.FromDateTime(now);
-        var currentTime = TimeOnly.FromDateTime(now);
-
-        if (date < today || (date == today && startTime < currentTime))
-        {
-            throw new BookingValidationException("Cannot search for available rooms in the past.", "PAST_SLOT_NOT_ALLOWED");
-        }
-
         var slotStart = date.ToDateTime(startTime);
         var slotEnd = date.ToDateTime(endTime);
 

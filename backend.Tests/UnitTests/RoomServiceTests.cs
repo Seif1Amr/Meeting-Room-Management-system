@@ -93,7 +93,7 @@ public class RoomServiceTests
     }
 
     [Fact]
-    public async Task GetAvailableRooms_PastTime_ThrowsBookingValidationException()
+    public async Task GetAvailableRooms_AnyValidSlot_ReturnsAvailableRoomsSuccessfully()
     {
         // Simulated current time: 2026-11-20 15:00
         var afternoon = new DateTime(2026, 11, 20, 15, 0, 0);
@@ -101,14 +101,15 @@ public class RoomServiceTests
         var dateProvider = new TestDateTimeProvider(afternoon);
         var service = new RoomService(context, dateProvider);
 
-        // Searching for morning 09:00 - 10:00 earlier today
-        await Assert.ThrowsAsync<BookingValidationException>(() =>
-            service.GetAvailableRoomsAsync(
-                new DateOnly(2026, 11, 20),
-                new TimeOnly(9, 0),
-                new TimeOnly(10, 0),
-                null
-            ));
+        // Searching for morning 09:00 - 10:00 succeeds and returns all 5 rooms
+        var rooms = (await service.GetAvailableRoomsAsync(
+            new DateOnly(2026, 11, 20),
+            new TimeOnly(9, 0),
+            new TimeOnly(10, 0),
+            null
+        )).ToList();
+
+        Assert.Equal(5, rooms.Count);
     }
 
     [Fact]
