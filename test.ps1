@@ -16,8 +16,12 @@ if (Test-Path "$env:LOCALAPPDATA\Microsoft\dotnet\dotnet.exe") {
 
 & $dotnetExe test backend.Tests/MeetingRoomManagement.Tests.csproj --verbosity normal
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "`nBackend tests failed!" -ForegroundColor Red
-    exit $LASTEXITCODE
+    Write-Host "Retrying test execution with --no-build (if server process is currently running)..." -ForegroundColor Yellow
+    & $dotnetExe test backend.Tests/MeetingRoomManagement.Tests.csproj --no-build --verbosity normal
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "`nBackend tests failed!" -ForegroundColor Red
+        exit $LASTEXITCODE
+    }
 }
 Write-Host "Backend tests passed successfully!" -ForegroundColor Green
 

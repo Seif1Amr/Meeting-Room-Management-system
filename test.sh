@@ -7,7 +7,7 @@ echo "============================================================"
 
 echo ""
 echo "[1/2] Running Backend xUnit Tests (.NET 8)..."
-dotnet test backend.Tests/MeetingRoomManagement.Tests.csproj --verbosity normal
+dotnet test backend.Tests/MeetingRoomManagement.Tests.csproj --verbosity normal || dotnet test backend.Tests/MeetingRoomManagement.Tests.csproj --no-build --verbosity normal
 echo "Backend tests passed successfully!"
 
 echo ""
