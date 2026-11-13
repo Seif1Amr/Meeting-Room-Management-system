@@ -64,7 +64,7 @@ public class BookingService : IBookingService
             throw new BookingValidationException("End time must be strictly after start time.", "INVALID_TIME_RANGE");
         }
 
-        if (request.StartTime < _dateTimeProvider.Now)
+        if (request.StartTime < _dateTimeProvider.Now.AddMinutes(-2))
         {
             throw new BookingValidationException("Bookings cannot be created in the past.", "PAST_BOOKING_NOT_ALLOWED");
         }

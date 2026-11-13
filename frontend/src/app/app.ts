@@ -53,6 +53,7 @@ export class App implements OnInit {
 
   // Modals state
   isBookingModalOpen = signal<boolean>(false);
+  modalInitialDate: string = new Date().toISOString().split('T')[0];
   modalInitialStartTime: string = '09:00';
   modalInitialEndTime: string = '10:00';
 
@@ -76,7 +77,7 @@ export class App implements OnInit {
     let initialEnd = '11:00';
 
     if (currentHour >= 19) {
-      // If evening, default availability search to tomorrow morning 09:00 - 11:00
+      // If evening, default availability search and timeline view to tomorrow morning 09:00 - 11:00
       const tomorrow = new Date(now);
       tomorrow.setDate(tomorrow.getDate() + 1);
       initialDate = tomorrow.toISOString().split('T')[0];
@@ -88,6 +89,8 @@ export class App implements OnInit {
       initialEnd = `${endH.toString().padStart(2, '0')}:00`;
     }
 
+    this.selectedDate.set(initialDate);
+    this.modalInitialDate = initialDate;
     this.filterDate = initialDate;
     this.filterStartTime = initialStart;
     this.filterEndTime = initialEnd;
@@ -213,6 +216,8 @@ export class App implements OnInit {
   // Date Navigation
   onDateChange(newDate: string): void {
     this.selectedDate.set(newDate);
+    this.modalInitialDate = newDate;
+    this.filterDate = newDate;
     if (this.selectedRoom()) {
       this.loadRoomSchedule(this.selectedRoom()!.id, newDate);
     }
@@ -300,13 +305,21 @@ export class App implements OnInit {
         this.isFilterActive.set(true);
         this.applyFilterAndSearch();
 
+        // 1. Synchronize timeline view date to the requested search date
+        this.selectedDate.set(this.filterDate);
+        this.modalInitialDate = this.filterDate;
+
+        // 2. Load schedule for searched date
         if (avail.length > 0) {
-          // If current room is not in available list, auto-select first available
-          if (!avail.some(r => r.id === this.selectedRoom()?.id)) {
-            this.selectRoom(avail[0]);
-          }
+          const current = this.selectedRoom();
+          const targetRoom = (current && avail.some(r => r.id === current.id)) ? current : avail[0];
+          this.selectedRoom.set(targetRoom);
+          this.loadRoomSchedule(targetRoom.id, this.filterDate);
           this.toastService.success(`Found ${avail.length} free room(s) for the requested slot.`, 'Availability Found');
         } else {
+          if (this.selectedRoom()) {
+            this.loadRoomSchedule(this.selectedRoom()!.id, this.filterDate);
+          }
           this.toastService.info('No rooms are completely free for that time slot and capacity.', 'No Rooms Available');
         }
       },
@@ -325,9 +338,36 @@ export class App implements OnInit {
   }
 
   // Quick reservation modal
-  openBookingModal(startTime?: string, endTime?: string): void {
-    this.modalInitialStartTime = startTime || '09:00';
-    this.modalInitialEndTime = endTime || '10:00';
+  openBookingModal(startTime?: string, endTime?: string, slotDate?: string): void {
+    const targetDate = slotDate || this.selectedDate();
+    this.modalInitialDate = targetDate;
+
+    if (startTime && endTime) {
+      this.modalInitialStartTime = startTime;
+      this.modalInitialEndTime = endTime;
+    } else if (this.isFilterActive()) {
+      this.modalInitialStartTime = this.filterStartTime;
+      this.modalInitialEndTime = this.filterEndTime;
+    } else {
+      const now = new Date();
+      const todayStr = now.toISOString().split('T')[0];
+      if (targetDate === todayStr) {
+        const curH = now.getHours();
+        if (curH >= 19) {
+          this.modalInitialStartTime = '09:00';
+          this.modalInitialEndTime = '10:00';
+        } else {
+          const nextH = Math.max(8, curH + 1);
+          const endH = Math.min(nextH + 1, 20);
+          this.modalInitialStartTime = `${nextH.toString().padStart(2, '0')}:00`;
+          this.modalInitialEndTime = `${endH.toString().padStart(2, '0')}:00`;
+        }
+      } else {
+        this.modalInitialStartTime = '09:00';
+        this.modalInitialEndTime = '10:00';
+      }
+    }
+
     this.isBookingModalOpen.set(true);
   }
 

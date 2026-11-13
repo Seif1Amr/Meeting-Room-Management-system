@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, OnInit, Output, inject } from '@angular/core';
+import { Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Room } from '../models/room.model';
@@ -13,7 +13,7 @@ import { ApiErrorResponse } from '../models/api-error.model';
   templateUrl: './booking-modal.component.html',
   styleUrls: ['./booking-modal.component.css']
 })
-export class BookingModalComponent implements OnInit {
+export class BookingModalComponent implements OnInit, OnChanges {
   private readonly fb = inject(FormBuilder);
   private readonly bookingService = inject(BookingService);
   private readonly toastService = inject(ToastService);
@@ -29,6 +29,7 @@ export class BookingModalComponent implements OnInit {
 
   bookingForm!: FormGroup;
   isSubmitting = false;
+  formSubmitted = false;
   apiErrorMessage: string | null = null;
   apiErrorCode: string | null = null;
 
@@ -37,16 +38,64 @@ export class BookingModalComponent implements OnInit {
 
   ngOnInit(): void {
     this.generateTimeOptions();
+    this.initForm();
+  }
 
-    const todayStr = this.initialDate || new Date().toISOString().split('T')[0];
+  ngOnChanges(changes: SimpleChanges): void {
+    if (this.bookingForm) {
+      if (changes['selectedRoomId'] && this.selectedRoomId !== null && this.selectedRoomId !== undefined) {
+        this.bookingForm.patchValue({ roomId: Number(this.selectedRoomId) });
+      }
+      if (changes['initialDate'] && this.initialDate) {
+        this.bookingForm.patchValue({ date: this.initialDate });
+      }
+      if (changes['initialStartTime'] && this.initialStartTime) {
+        this.bookingForm.patchValue({ startTime: this.initialStartTime });
+      }
+      if (changes['initialEndTime'] && this.initialEndTime) {
+        this.bookingForm.patchValue({ endTime: this.initialEndTime });
+      }
+    }
+  }
+
+  private initForm(): void {
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+    let defaultDate = this.initialDate || todayStr;
+    let defaultStart = this.initialStartTime || '09:00';
+    let defaultEnd = this.initialEndTime || '10:00';
+
+    // If defaultDate is today, ensure default start time is not already in the past
+    if (defaultDate === todayStr) {
+      const [sh, sm] = defaultStart.split(':').map(Number);
+      const startMinutes = sh * 60 + sm;
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+      if (startMinutes <= currentMinutes) {
+        if (now.getHours() >= 19) {
+          const tomorrow = new Date(now);
+          tomorrow.setDate(tomorrow.getDate() + 1);
+          defaultDate = tomorrow.toISOString().split('T')[0];
+          defaultStart = '09:00';
+          defaultEnd = '10:00';
+        } else {
+          const nextH = Math.max(8, now.getHours() + 1);
+          const endH = Math.min(nextH + 1, 20);
+          defaultStart = `${nextH.toString().padStart(2, '0')}:00`;
+          defaultEnd = `${endH.toString().padStart(2, '0')}:00`;
+        }
+      }
+    }
+
+    const defaultRoomId = this.selectedRoomId ?? (this.rooms.length > 0 ? this.rooms[0].id : null);
 
     this.bookingForm = this.fb.group({
-      roomId: [this.selectedRoomId || (this.rooms.length > 0 ? this.rooms[0].id : null), [Validators.required]],
+      roomId: [defaultRoomId, [Validators.required]],
       title: ['', [Validators.required, Validators.minLength(2), Validators.maxLength(100)]],
       bookedBy: ['', [Validators.required, Validators.minLength(2), Validators.maxLength(100)]],
-      date: [todayStr, [Validators.required]],
-      startTime: [this.initialStartTime || '09:00', [Validators.required]],
-      endTime: [this.initialEndTime || '10:00', [Validators.required]]
+      date: [defaultDate, [Validators.required]],
+      startTime: [defaultStart, [Validators.required]],
+      endTime: [defaultEnd, [Validators.required]]
     }, {
       validators: [this.validateTimeRules]
     });
@@ -96,10 +145,10 @@ export class BookingModalComponent implements OnInit {
       return { exceedsMaxDuration: true };
     }
 
-    // Rule: Cannot book in past
+    // Rule: Cannot book in past (with 2 min buffer)
     const selectedStart = new Date(`${dateStr}T${startStr}:00`);
     const now = new Date();
-    if (selectedStart.getTime() < now.getTime() - 60000) { // 1 min buffer
+    if (selectedStart.getTime() < now.getTime() - 120000) {
       return { pastDate: true };
     }
 
@@ -124,8 +173,28 @@ export class BookingModalComponent implements OnInit {
   }
 
   submitBooking(): void {
+    this.formSubmitted = true;
+
     if (this.bookingForm.invalid) {
       this.bookingForm.markAllAsTouched();
+
+      const errors = this.bookingForm.errors;
+      if (errors?.['pastDate']) {
+        this.apiErrorMessage = 'Cannot schedule meetings in the past. Please select a future date or time.';
+        this.toastService.warning('Cannot schedule meetings in the past.', 'Validation Warning');
+      } else if (errors?.['endBeforeStart']) {
+        this.apiErrorMessage = 'End time must be strictly after start time.';
+        this.toastService.warning('End time must be strictly after start time.', 'Validation Warning');
+      } else if (errors?.['outsideWorkingHours']) {
+        this.apiErrorMessage = 'Bookings must be scheduled between 08:00 and 20:00.';
+        this.toastService.warning('Bookings must be between 08:00 and 20:00.', 'Validation Warning');
+      } else if (errors?.['exceedsMaxDuration']) {
+        this.apiErrorMessage = 'Duration cannot exceed 4 hours.';
+        this.toastService.warning('Duration cannot exceed 4 hours.', 'Validation Warning');
+      } else {
+        this.apiErrorMessage = 'Please check the required fields (Title, Organizer, Room).';
+        this.toastService.warning('Please complete all required fields.', 'Validation Warning');
+      }
       return;
     }
 

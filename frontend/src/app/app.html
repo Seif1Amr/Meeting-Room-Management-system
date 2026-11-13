@@ -331,7 +331,7 @@
                     <button
                       type="button"
                       class="btn-quick-reserve"
-                      (click)="openBookingModal(slot.startFormatted, slot.endFormatted)"
+                      (click)="openBookingModal(slot.startFormatted, slot.endFormatted, selectedDate())"
                     >
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -369,7 +369,7 @@
     *ngIf="isBookingModalOpen()"
     [rooms]="rooms()"
     [selectedRoomId]="selectedRoom()?.id || null"
-    [initialDate]="selectedDate()"
+    [initialDate]="modalInitialDate"
     [initialStartTime]="modalInitialStartTime"
     [initialEndTime]="modalInitialEndTime"
     (closed)="isBookingModalOpen.set(false)"
